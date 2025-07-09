@@ -1,13 +1,24 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 const app = express();
 const port = 3000;
 
 app.get('/scrape-weather/:city', async (req, res) => {
     const city = req.params.city;
 
-    // Launch Puppeteer browser
-    const browser = await puppeteer.launch({ headless: true });
+    // Launch Puppeteer browser with Chromium path and additional arguments
+    const browser = await puppeteer.launch({
+        headless: true,
+        executablePath: '/usr/bin/chromium-browser',  // Render's default path for Chromium
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-gpu',
+            '--disable-dev-shm-usage',
+            '--remote-debugging-port=9222'
+        ]
+    });
+
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
 
@@ -72,5 +83,5 @@ app.get('/scrape-weather/:city', async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Weather scraper app listening at http://pakistanify.com:${port}`);
+    console.log(`Weather scraper app listening`);
 });
