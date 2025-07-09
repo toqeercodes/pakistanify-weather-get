@@ -1,0 +1,16 @@
+{
+    "name": "weather-scraper",
+    "version": "1.0.0",
+    "description": "A simple weather scraper using Puppeteer and Express",
+    "main": "scrape.js",
+    "scripts": {
+        "start": "node scrape.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "express": "^4.17.1",
+        "puppeteer": "^24.12.1"
+    }
+}
