@@ -1,76 +1,69 @@
 const express = require('express');
-const puppeteer = require('puppeteer-core'); // Make sure to use puppeteer-core
+const puppeteer = require('puppeteer-extra');
+const puppeteerStealth = require('puppeteer-extra-plugin-stealth');
 const app = express();
 const port = 3000;
+
+// Use the Stealth plugin
+puppeteer.use(puppeteerStealth());
 
 app.get('/scrape-weather/:city', async (req, res) => {
     const city = req.params.city;
 
-    // Launch Puppeteer with specified Chromium path on Render
-    const browser = await puppeteer.launch({
-        headless: true,
-        executablePath: '/usr/bin/chromium-browser', // Path for Chromium on Render
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-gpu',
-            '--disable-dev-shm-usage',
-            '--remote-debugging-port=9222'
-        ]
-    });
-    
-
-    const version = await browser.version();
-    console.log("Chromium Version: ", version);
-
-    const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-
-    // Go to the weather page for the given city
-    const url = `https://world-weather.info/forecast/pakistan/${city}`;
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
-
-    // Wait for the weather number to appear
-    await page.waitForSelector('#content-left #weather-now-number');
-
-    // Extract all the required data
-    const weatherData = await page.evaluate(() => {
-        const data = {};
-        console.log("data: ", data);
-        data.weatherNowNumber = document.querySelector('#content-left #weather-now-number')?.textContent.trim().replace("°F", "");
-        data.weatherNowDescription = document.querySelector('#weather-now-description dl')?.innerHTML.replace(/\n/g, "");
-        data.sun = document.querySelector('.sun')?.innerHTML.replace(/\n/g, "");
-        data.dwInto = document.querySelector('.dw-into')?.textContent.trim().replace(/\n/g, "");
-        data.daysVerticalTabs = document.querySelector('#vertical_tabs')?.innerHTML.replace(/\n/g, "");
-        data.iconTitle = document.querySelector('#weather-now-icon')?.getAttribute('title');
-        data.iconHtml = document.querySelector('#weather-now-icon')?.outerHTML;
-
-        const panes = [];
-        const paneElements = document.querySelectorAll('#content-left .pane');
-        paneElements.forEach(pane => {
-            panes.push(pane.outerHTML);
+    try {
+        // Launch Puppeteer with Stealth plugin and full configurations
+        const browser = await puppeteer.launch({
+            headless: true,
+            args: [
+                '--proxy-server=http://your-proxy-server:port',
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-gpu',
+                '--disable-dev-shm-usage',
+                '--remote-debugging-port=9222',
+                '--window-size=1280x800'
+            ]
         });
-        data.panes = panes;
 
-        const slBoxes = [];
-        const slBoxElements = document.querySelectorAll('.sl-box .sl-item');
-        slBoxElements.forEach(slBox => {
-            const slItemTxt = slBox.querySelector('.sl-item-txt')?.innerHTML.trim();
-            const slItemAllTxt = slBox.querySelector('.sl-item-all-txt')?.innerHTML.trim();
-            slBoxes.push({ slItemTxt, slItemAllTxt });
+
+        const page = await browser.newPage();
+
+        // Set up user agent and other necessary headers
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+        await page.setExtraHTTPHeaders({
+            'accept-language': 'en-US,en;q=0.9',
+            'accept-encoding': 'gzip, deflate, br',
         });
-        data.slBoxes = slBoxes;
 
-        return data;
-    });
+        // Go to the weather page for the given city
+        const url = `https://world-weather.info/forecast/pakistan/${city}`;
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    // Close the browser
-    await browser.close();
+        // Wait for a specific element to make sure the page has loaded
+        await page.waitForSelector('#content-left #weather-now-number');
 
-    // Send the extracted data as JSON
-    res.json(weatherData);
+        // Extract the HTML content
+        const pageContent = await page.content();  // This will give you the full HTML content
+
+        // Optionally, you can scrape specific data here instead of the whole page
+        // const weatherData = await page.evaluate(() => {
+        //     return {
+        //         temperature: document.querySelector('#content-left #weather-now-number').textContent.trim()
+        //     };
+        // });
+
+        // Close the browser
+        await browser.close();
+
+        // Send the extracted HTML or data as JSON
+        res.json({ html: pageContent });
+
+    } catch (error) {
+        console.error("Error:", error);
+        res.status(500).send("Error scraping the website");
+    }
 });
 
 app.listen(port, () => {
-    console.log(`Weather scraper app listening at http://localhost:${port}`);
+    console.log(`Weather scraper app listening`);
 });
