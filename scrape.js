@@ -58,5 +58,5 @@ app.get('/scrape-weather/ahmadpur_east', async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Weather scraper app listening on port ${port}`);
+    console.log(`zzzz Weather scraper app listening on port ${port}`);
 });
