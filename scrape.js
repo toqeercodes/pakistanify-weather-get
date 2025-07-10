@@ -3,13 +3,15 @@ const puppeteer = require('puppeteer');
 const app = express();
 const port = 3000;
 
-// Hardcoded route for ahmadpur_east
-app.get('/scrape-weather/ahmadpur_east', async (req, res) => {
-    const url = 'https://world-weather.info/forecast/pakistan/ahmadpur_east/';
+// --- CHANGE 1: The route now accepts a dynamic :city parameter ---
+app.get('/scrape-weather/:city', async (req, res) => {
+    // --- CHANGE 2: Get the city from the URL and format it correctly ---
+    const citySlug = req.params.city.toLowerCase().replace(/_/g, '-').replace(/ /g, '-');
+    const url = `https://world-weather.info/forecast/pakistan/${citySlug}/`;
+    
     let browser;
 
     try {
-        // --- SOLUTION: Add args for running in a server/container environment ---
         browser = await puppeteer.launch({
             headless: true,
             args: ['--no-sandbox', '--disable-setuid-sandbox']
@@ -20,10 +22,9 @@ app.get('/scrape-weather/ahmadpur_east', async (req, res) => {
 
         console.log(`Navigating to ${url}...`);
 
-        // Add a 60-second timeout to give the page more time to load
         await page.goto(url, {
             waitUntil: 'networkidle0',
-            timeout: 60000 // 60 seconds (increased from 30)
+            timeout: 60000 
         });
 
         console.log('Page loaded. Scraping data...');
@@ -63,5 +64,5 @@ app.get('/scrape-weather/ahmadpur_east', async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`zzzz Weather scraper app listening on port ${port}`);
+    console.log(`Weather scraper app listening on port ${port}`);
 });
