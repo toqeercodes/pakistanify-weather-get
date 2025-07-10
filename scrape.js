@@ -19,7 +19,12 @@ app.get('/scrape-weather/ahmadpur_east', async (req, res) => {
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
 
         console.log(`Navigating to ${url}...`);
-        await page.goto(url, { waitUntil: 'networkidle0' });
+
+        // Add a 60-second timeout to give the page more time to load
+        await page.goto(url, {
+            waitUntil: 'networkidle0',
+            timeout: 60000 // 60 seconds (increased from 30)
+        });
 
         console.log('Page loaded. Scraping data...');
         await page.waitForSelector('#weather-now-number', { timeout: 15000 });
