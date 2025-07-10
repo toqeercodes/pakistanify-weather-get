@@ -1,3 +1,4 @@
+
 const express = require('express');
 const puppeteer = require('puppeteer');
 const app = express();
@@ -24,11 +25,11 @@ app.get('/scrape-weather/:city', async (req, res) => {
 
         await page.goto(url, {
             waitUntil: 'networkidle0',
-            timeout: 60000 
+            timeout: 90000 
         });
 
         console.log('Page loaded. Scraping data...');
-        await page.waitForSelector('#weather-now-number', { timeout: 15000 });
+        await page.waitForSelector('#weather-now-number', { timeout: 120000 });
 
         const weatherData = await page.evaluate(() => {
             const data = {};
