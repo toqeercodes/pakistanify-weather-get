@@ -7,7 +7,7 @@ const port = 3000;
 // --- CHANGE 1: The route now accepts a dynamic :city parameter ---
 app.get('/scrape-weather/:city', async (req, res) => {
     // --- CHANGE 2: Get the city from the URL and format it correctly ---
-    const citySlug = req.params.city.toLowerCase().replace(/_/g, '-').replace(/ /g, '-');
+    const citySlug = req.params.city?.toLowerCase() || '';
     const url = `https://world-weather.info/forecast/pakistan/${citySlug}/`;
     
     let browser;
