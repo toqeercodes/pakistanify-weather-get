@@ -6,40 +6,52 @@ const port = 3000;
 // In-memory cache
 const cache = {};
 
+// Global browser instance
+let browser;
+
+// Initialize the browser once and reuse it for all requests
+async function initBrowser() {
+    if (!browser) {
+        browser = await puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+        console.log("Browser instance initialized.");
+    }
+}
+
 // --- CHANGE 1: The route now accepts a dynamic :city parameter ---
 app.get('/scrape-weather/:city', async (req, res) => {
-    // --- CHANGE 2: Get the city from the URL and format it correctly ---
     const citySlug = req.params.city?.toLowerCase() || '';
     const cacheKey = `weather_${citySlug}`;
 
-    // --- CHANGE 3: Check if data is cached ---
+    // --- CHANGE 2: Check if data is cached ---
     if (cache[cacheKey]) {
         console.log(`Returning cached data for ${citySlug}`);
         return res.json(cache[cacheKey]);
     }
 
     const url = `https://world-weather.info/forecast/pakistan/${citySlug}/`;
-    let browser;
 
+    let page;
     try {
-        browser = await puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
+        // Initialize the browser if not already initialized
+        await initBrowser();
 
-        const page = await browser.newPage();
+        // Create a new page from the existing browser instance
+        page = await browser.newPage();
 
-        // --- CHANGE 4: Block unnecessary resources like images, CSS, fonts ---
+        // --- CHANGE 3: Block unnecessary resources like images, CSS, fonts ---
         await page.setRequestInterception(true);
         page.on('request', (request) => {
             if (['image', 'stylesheet', 'font'].includes(request.resourceType())) {
-                request.abort();
+                request.abort(); // Block images, CSS, and fonts to speed up the page load
             } else {
                 request.continue();
             }
         });
 
-        // --- CHANGE 5: Set user-agent to avoid detection ---
+        // --- CHANGE 4: Set user-agent to avoid detection ---
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
 
         console.log(`Navigating to ${url}`);
@@ -49,10 +61,9 @@ app.get('/scrape-weather/:city', async (req, res) => {
         });
 
         console.log('Page loaded. Scraping data...');
-        // --- CHANGE 6: Wait for the necessary selector ---
         await page.waitForSelector('#weather-now-number', { timeout: 180000 });
 
-        // --- CHANGE 7: Scrape the data ---
+        // --- CHANGE 5: Scrape the data ---
         const weatherData = await page.evaluate(() => {
             const data = {};
             const getText = (selector) => document.querySelector(selector)?.textContent.trim();
@@ -74,7 +85,7 @@ app.get('/scrape-weather/:city', async (req, res) => {
             return data;
         });
 
-        // --- CHANGE 8: Cache the scraped data ---
+        // --- CHANGE 6: Cache the scraped data ---
         cache[cacheKey] = weatherData;
 
         res.json(weatherData);
@@ -83,9 +94,17 @@ app.get('/scrape-weather/:city', async (req, res) => {
         console.error(`Error scraping ${url}:`, error.message);
         res.status(500).json({ error: `Failed to scrape weather data.`, details: error.message });
     } finally {
-        if (browser) {
-            await browser.close();
+        if (page) {
+            await page.close(); // Close the page after processing
         }
+    }
+});
+
+// --- CHANGE 7: Gracefully shut down the browser instance ---
+process.on('exit', async () => {
+    if (browser) {
+        await browser.close();
+        console.log('Browser instance closed.');
     }
 });
 
