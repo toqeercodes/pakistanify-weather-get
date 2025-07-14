@@ -1,16 +1,17 @@
+
 const express = require('express');
 const puppeteer = require('puppeteer');
 const app = express();
 const port = 3000;
 
-// In-memory cache to avoid redundant scraping
-const cache = {};
-
-// Function to scrape weather data for a single city
-const scrapeWeatherForCity = async (citySlug) => {
+// --- CHANGE 1: The route now accepts a dynamic :city parameter ---
+app.get('/scrape-weather/:city', async (req, res) => {
+    // --- CHANGE 2: Get the city from the URL and format it correctly ---
+    const citySlug = req.params.city?.toLowerCase() || '';
     const url = `https://world-weather.info/forecast/pakistan/${citySlug}/`;
-
+    
     let browser;
+
     try {
         browser = await puppeteer.launch({
             headless: true,
@@ -20,11 +21,14 @@ const scrapeWeatherForCity = async (citySlug) => {
         const page = await browser.newPage();
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
 
+        console.log(`Navigating to ${url}`);
+
         await page.goto(url, {
             waitUntil: 'networkidle0',
-            timeout: 90000
+            timeout: 90000 
         });
 
+        console.log('Page loaded. Scraping data...');
         await page.waitForSelector('#weather-now-number', { timeout: 120000 });
 
         const weatherData = await page.evaluate(() => {
@@ -48,46 +52,15 @@ const scrapeWeatherForCity = async (citySlug) => {
             return data;
         });
 
-        return weatherData;
+        res.json(weatherData);
 
     } catch (error) {
         console.error(`Error scraping ${url}:`, error.message);
-        throw new Error(`Failed to scrape weather data for ${citySlug}.`);
+        res.status(500).json({ error: `Failed to scrape weather data.`, details: error.message });
     } finally {
         if (browser) {
             await browser.close();
         }
-    }
-};
-
-// Route to scrape weather data for multiple cities concurrently
-app.get('/scrape-weather', async (req, res) => {
-    const cities = req.query.cities?.split(',') || [];
-    
-    if (cities.length === 0) {
-        return res.status(400).json({ error: 'Please provide a list of cities to scrape.' });
-    }
-
-    try {
-        // Check cache first to avoid redundant requests
-        const citiesData = await Promise.all(
-            cities.map(async (city) => {
-                if (cache[city]) {
-                    console.log(`Returning cached data for ${city}`);
-                    return { city, data: cache[city] };
-                }
-                const citySlug = city.toLowerCase();
-                const weatherData = await scrapeWeatherForCity(citySlug);
-                cache[city] = weatherData;  // Cache the result
-                return { city, data: weatherData };
-            })
-        );
-
-        res.json(citiesData);
-
-    } catch (error) {
-        console.error('Error fetching weather data for cities:', error.message);
-        res.status(500).json({ error: 'Failed to fetch weather data for cities.' });
     }
 });
 
